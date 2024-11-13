@@ -62,8 +62,18 @@ class Dealer(Player):
         else:
             return f"{self.name}'s hand: {self.hand[0]}, [Hidden Card]"
 
+# AI decision function
+def ai_decision(player_total, dealer_card):
+    # Basic strategy for blackjack
+    if player_total >= 17:
+        return 's'  # Stand
+    elif player_total >= 12 and dealer_card.rank in ['4', '5', '6']:
+        return 's'  # Stand against weak dealer
+    else:
+        return 'h'  # Hit
+
 # Game function
-def play_blackjack():
+def play_blackjack_with_ai():
     deck = Deck()
     dealer = Dealer()
     players = [Player(f"Player {i + 1}") for i in range(5)]
@@ -79,14 +89,15 @@ def play_blackjack():
     for player in players:
         print(player.show_hand())  # Show all players' hands
 
-    # Players' turn
+    # Players' turn with AI
     for player in players:
         while True:
-            print(f"{player.name}, your total is {player.total}. Hit (h) or Stand (s)?")
-            choice = input().strip().lower()
+            print(f"{player.name}, your total is {player.total}. AI is making a decision...")
+            choice = ai_decision(player.total, dealer.hand[0])  # Use AI decision
+            print(f"AI chose to: {'Hit' if choice == 'h' else 'Stand'}")
             if choice == 'h':
                 player.add_card(deck.deal_card())
-                print(player.show_hand())  # Show updated hand
+                print(player.show_hand())
                 if player.total > 21:
                     print(f"{player.name} busts!")
                     break
@@ -108,10 +119,10 @@ def play_blackjack():
         elif dealer.total > 21 or player.total > dealer.total:
             print(f"{player.name} wins!")
         elif player.total < dealer.total:
-            print(f"{player.name} loses.")
+            print(f"{ player.name} loses.")
         else:
             print(f"{player.name} ties with the dealer.")
 
-# Run the game
+# Run the game with AI
 if __name__ == "__main__":
-    play_blackjack()
+    play_blackjack_with_ai()
