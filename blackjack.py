@@ -1,23 +1,23 @@
 import random
+import sqlite3
+import csv
 
 # Constants
 NUM_DECKS = 6
-SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
 # Card class
 class Card:
-    def __init__(self, rank, suit):
+    def __init__(self, rank):
         self.rank = rank
-        self.suit = suit
 
     def __str__(self):
-        return f"{self.rank} of {self.suit}"
+        return self.rank
 
 # Deck class
 class Deck:
     def __init__(self):
-        self.cards = [Card(rank, suit) for _ in range(NUM_DECKS) for suit in SUITS for rank in RANKS]
+        self.cards = [Card(rank) for _ in range(NUM_DECKS) for rank in RANKS]
         random.shuffle(self.cards)
 
     def deal_card(self):
@@ -72,6 +72,32 @@ def ai_decision(player_total, dealer_card):
     else:
         return 'h'  # Hit
 
+# Database setup
+def setup_database():
+    conn = sqlite3.connect('blackjack_results.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY,
+            player_hands TEXT,
+            dealer_hand TEXT,
+            result TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Save results to the database
+def save_results(player_hands, dealer_hand, result):
+    conn = sqlite3.connect('blackjack_results.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO results (player_hands, dealer_hand, result)
+        VALUES (?, ?, ?)
+    ''', (player_hands, dealer_hand, result))
+    conn.commit()
+    conn.close()
+
 # Game function
 def play_blackjack_with_ai():
     deck = Deck()
@@ -84,45 +110,62 @@ def play_blackjack_with_ai():
         for player in players:
             player.add_card(deck.deal_card())
 
-    # Show initial hands
-    print(dealer.show_hand())  # Dealer shows one card
-    for player in players:
-        print(player.show_hand())  # Show all players' hands
-
     # Players' turn with AI
     for player in players:
         while True:
-            print(f"{player.name}, your total is {player.total}. AI is making a decision...")
             choice = ai_decision(player.total, dealer.hand[0])  # Use AI decision
-            print(f"AI chose to: {'Hit' if choice == 'h' else 'Stand'}")
             if choice == 'h':
                 player.add_card(deck.deal_card())
-                print(player.show_hand())
                 if player.total > 21:
-                    print(f"{player.name} busts!")
                     break
             elif choice == 's':
                 break
 
     # Dealer's turn
-    print("\nDealer's turn:")
-    print(dealer.show_hand(reveal=True))  # Show dealer's full hand
     while dealer.total < 17:
         dealer.add_card(deck.deal_card())
-        print(dealer.show_hand(reveal=True))  # Show dealer's hand after each card is added
 
-    # Determine winners
-    print("\nFinal Results:")
+    # Determine winners and prepare results
+    results = []
     for player in players:
         if player.total > 21:
-            print(f"{player.name} loses.")
+            results.append(f"{player.name} loses.")
         elif dealer.total > 21 or player.total > dealer.total:
-            print(f"{player.name} wins!")
+            results.append(f"{player.name} wins!")
         elif player.total < dealer.total:
-            print(f"{ player.name} loses.")
+            results.append(f"{player .name} loses.")
         else:
-            print(f"{player.name} ties with the dealer.")
+            results.append(f"{player.name} ties with the dealer.")
 
-# Run the game with AI
+    # Prepare data for saving
+    player_hands = ', '.join(f"{player.name}: {', '.join(str(card) for card in player.hand)}" for player in players)
+    dealer_hand = dealer.show_hand(reveal=True)
+    result_summary = ', '.join(results)
+
+    # Save results to the database
+    save_results(player_hands, dealer_hand, result_summary)
+
+# Export results to CSV
+def export_to_csv(filename):
+    conn = sqlite3.connect('blackjack_results.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM results')
+    rows = cursor.fetchall()
+
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['ID', 'Player Hands', 'Dealer Hand', 'Result'])  # Header
+        writer.writerows(rows)
+
+    conn.close()
+
+# Run the game multiple times
+def run_multiple_games(num_games):
+    setup_database()
+    for _ in range(num_games):
+        play_blackjack_with_ai()
+    export_to_csv('blackjack_results.csv')  # Export results after running games
+
+# Execute the program
 if __name__ == "__main__":
-    play_blackjack_with_ai()
+    run_multiple_games(10000)
